@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auramis AI — Invoice Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    /* ─── DESIGN TOKENS ─────────────────────────────── */
+    :root, [data-theme="light"] {
+      --color-bg:              #f2f2f2;
+      --color-surface:         #ffffff;
+      --color-surface-2:       #f8f8f8;
+      --color-surface-offset:  #eeeeee;
+      --color-surface-dynamic: #e4e4e4;
+      --color-divider:         #e0e0e0;
+      --color-border:          #d8d8d8;
+      --color-text:            #111111;
+      --color-text-muted:      #666666;
+      --color-text-faint:      #aaaaaa;
+      --color-primary:         #111111;
+      --color-primary-hover:   #333333;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+      --radius-sm: 0.25rem;
+      --radius-md: 0.375rem;
+      --radius-lg: 0.5rem;
+      --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      --font-body: 'Inter', 'Helvetica Neue', sans-serif;
+    }
+    [data-theme="dark"] {
+      --color-bg:              #141414;
+      --color-surface:         #1c1c1c;
+      --color-surface-2:       #222222;
+      --color-surface-offset:  #1a1a1a;
+      --color-surface-dynamic: #282828;
+      --color-divider:         #2a2a2a;
+      --color-border:          #333333;
+      --color-text:            #e0e0e0;
+      --color-text-muted:      #888888;
+      --color-text-faint:      #444444;
+      --color-primary:         #e0e0e0;
+      --color-primary-hover:   #ffffff;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
+    }
+
+    /* ─── BASE ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; height: 100%; }
+    body {
+      min-height: 100dvh;
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--color-text);
+      background: var(--color-bg);
+      line-height: 1.5;
+    }
+    input, select, textarea, button { font: inherit; color: inherit; }
+    button { cursor: pointer; background: none; border: none; }
+    a, button, input, select, textarea {
+      transition: color var(--transition), background var(--transition),
+                  border-color var(--transition), box-shadow var(--transition);
+    }
+    :focus-visible { outline: 2px solid #111; outline-offset: 2px; border-radius: 2px; }
+
+    /* ─── APP SHELL ─────────────────────────────────── */
+    .app { display: flex; flex-direction: column; min-height: 100dvh; }
+
+    /* ─── TOP BAR ───────────────────────────────────── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 24px;
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+      position: sticky; top: 0; z-index: 100;
+      gap: 16px; height: 52px;
+    }
+    .topbar-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px; letter-spacing: 0.12em; color: var(--color-text);
+    }
+    .topbar-brand svg { flex-shrink: 0; }
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+    /* ─── BUTTONS ───────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: var(--radius-md);
+      font-size: 12px; font-weight: 500; white-space: nowrap;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: #111; color: #fff; border-color: #111;
+    }
+    .btn-primary:hover { background: #333; border-color: #333; }
+    .btn-secondary {
+      background: var(--color-surface-2); color: var(--color-text);
+      border-color: var(--color-border);
+    }
+    .btn-secondary:hover { background: var(--color-surface-dynamic); }
+    .btn-ghost { color: var(--color-text-muted); padding: 6px 10px; }
+    .btn-ghost:hover { color: var(--color-text); background: var(--color-surface-offset); border-radius: var(--radius-md); }
+    .btn-danger { color: #cc2020; padding: 5px 8px; border-radius: var(--radius-md); }
+    .btn-danger:hover { background: #fff0f0; }
+    [data-theme="dark"] .btn-danger:hover { background: #2a1515; }
+    .btn-icon { padding: 6px; border-radius: var(--radius-md); color: var(--color-text-muted); }
+    .btn-icon:hover { background: var(--color-surface-offset); color: var(--color-text); }
+
+    /* ─── MAIN LAYOUT ───────────────────────────────── */
+    .workspace {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      flex: 1;
+    }
+
+    /* ─── FORM PANEL ────────────────────────────────── */
+    .form-panel {
+      background: var(--color-surface);
+      border-right: 1px solid var(--color-border);
+      overflow-y: auto;
+      height: calc(100dvh - 52px);
+      position: sticky; top: 52px;
+    }
+    .form-section {
+      border-bottom: 1px solid var(--color-divider);
+      padding: 16px 20px;
+    }
+    .form-section:last-child { border-bottom: none; }
+    .section-label {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--color-text-faint); margin-bottom: 12px;
+    }
+    .field { margin-bottom: 10px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block; font-size: 11px; font-weight: 500;
+      color: var(--color-text-muted); margin-bottom: 4px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 6px 10px;
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: 12px; color: var(--color-text);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none;
+      border-color: #111;
+      box-shadow: 0 0 0 2px rgba(17,17,17,0.1);
+    }
+    [data-theme="dark"] .field input:focus,
+    [data-theme="dark"] .field select:focus,
+    [data-theme="dark"] .field textarea:focus {
+      border-color: #888;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
+    }
+    .field textarea { resize: vertical; min-height: 60px; }
+    .field select {
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+      appearance: none; padding-right: 26px;
+    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    /* ─── LINE ITEMS ────────────────────────────────── */
+    .li-header {
+      display: grid;
+      grid-template-columns: 1fr 64px 80px 80px 28px;
+      gap: 6px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--color-divider);
+      margin-bottom: 8px;
+    }
+    .li-header span {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--color-text-faint);
+    }
+    .li-header span:not(:first-child) { text-align: right; }
+    .line-item {
+      display: grid;
+      grid-template-columns: 1fr 64px 80px 80px 28px;
+      gap: 6px; margin-bottom: 6px; align-items: center;
+    }
+    .line-item input {
+      width: 100%; padding: 5px 8px;
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: 11px; color: var(--color-text);
+    }
+    .line-item input:focus {
+      outline: none; border-color: #111;
+      box-shadow: 0 0 0 2px rgba(17,17,17,0.08);
+    }
+    [data-theme="dark"] .line-item input:focus { border-color: #888; box-shadow: 0 0 0 2px rgba(255,255,255,0.07); }
+    .line-item input:not(:first-child) { text-align: right; }
+    .li-amount {
+      font-size: 11px; color: var(--color-text-muted);
+      text-align: right; padding: 0 4px;
+      font-variant-numeric: tabular-nums;
+    }
+    .add-item-btn {
+      display: flex; align-items: center; gap: 6px;
+      color: #555; font-size: 11px; font-weight: 500;
+      padding: 6px 0; background: none; border: none; cursor: pointer;
+      transition: color var(--transition);
+    }
+    .add-item-btn:hover { color: #111; }
+    [data-theme="dark"] .add-item-btn { color: var(--color-text-muted); }
+    [data-theme="dark"] .add-item-btn:hover { color: var(--color-text); }
+
+    /* ─── FORM TOTALS ───────────────────────────────── */
+    .form-totals { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-divider); }
+    .ft-row {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--color-text-muted);
+      padding: 3px 0;
+    }
+    .ft-row.total {
+      font-size: 13px; font-weight: 700;
+      color: var(--color-text); padding-top: 8px;
+      border-top: 1px solid var(--color-divider); margin-top: 4px;
+    }
+    .ft-row .val { font-variant-numeric: tabular-nums; }
+
+    /* ─── PREVIEW PANEL ─────────────────────────────── */
+    .preview-panel {
+      background: var(--color-bg);
+      overflow-y: auto;
+      padding: 32px 40px;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .preview-actions {
+      display: flex; gap: 10px; margin-bottom: 20px;
+      width: 100%; max-width: 760px; justify-content: flex-end;
+    }
+    .preview-panel::-webkit-scrollbar { width: 5px; }
+    .preview-panel::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+    .form-panel::-webkit-scrollbar { width: 5px; }
+    .form-panel::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+
+    /* ─── INVOICE DOCUMENT ──────────────────────────── */
+    #invoice-doc {
+      width: 100%; max-width: 760px;
+      background: #ffffff;
+      color: #111111;
+      box-shadow: var(--shadow-lg);
+      font-family: 'Inter', 'Helvetica Neue', sans-serif;
+      padding: 52px 56px 48px;
+      position: relative;
+    }
+
+    /* TOP: Brand name top right */
+    .inv-topbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 28px;
+    }
+    .inv-brand-text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 36px;
+      letter-spacing: 0.12em;
+      color: #111;
+      line-height: 1;
+    }
+
+    /* INVOICE large title + line */
+    .inv-title-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .inv-title-text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 64px;
+      letter-spacing: 0.04em;
+      color: #111;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .inv-title-line {
+      flex: 1;
+      height: 2px;
+      background: #111;
+      margin-bottom: 2px;
+    }
+
+    /* Date + Invoice No (right aligned) */
+    .inv-meta-row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 24px;
+      margin-bottom: 36px;
+    }
+    .inv-meta-item { font-size: 12px; color: #333; }
+    .inv-meta-item strong { color: #111; }
+
+    /* Invoice To section */
+    .inv-to-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+    .inv-client-name {
+      font-size: 26px; font-weight: 700;
+      color: #111; line-height: 1.2; margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .inv-client-detail { font-size: 12px; color: #555; line-height: 1.8; margin-bottom: 36px; }
+
+    /* Services table */
+    .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+    .inv-table thead tr {
+      border-bottom: 1.5px solid #111;
+    }
+    .inv-table thead th {
+      padding: 8px 0; text-align: left;
+      font-size: 12px; font-weight: 600; color: #111;
+    }
+    .inv-table thead th:not(:first-child) { text-align: right; }
+    .inv-table tbody tr {
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .inv-table tbody tr:last-child { border-bottom: none; }
+    .inv-table tbody td {
+      padding: 14px 0; font-size: 13px; color: #333;
+    }
+    .inv-table tbody td:not(:first-child) {
+      text-align: right; font-variant-numeric: tabular-nums;
+    }
+    .inv-table tfoot tr { border-top: none; }
+    .inv-table tfoot td { padding: 4px 0; font-size: 12px; color: #555; }
+    .inv-table tfoot td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Spacer rows for empty table */
+    .inv-table .spacer td { height: 32px; border: none; }
+
+    /* Bottom total bar */
+    .inv-total-bar {
+      display: flex;
+      align-items: stretch;
+      justify-content: flex-end;
+      border-top: 1.5px solid #111;
+      margin-top: 0;
+    }
+    .inv-payment-due {
+      flex: 1;
+      font-size: 12px;
+      color: #333;
+      display: flex;
+      align-items: center;
+      padding: 14px 0;
+    }
+    .inv-total-label {
+      background: #888888;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+    }
+    .inv-total-amount {
+      background: #111111;
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
+      min-width: 110px;
+    }
+
+    /* Footer: two columns */
+    .inv-footer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
+    }
+    .inv-footer-section {}
+    .inv-footer-label {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: #111; margin-bottom: 10px;
+      border-bottom: 1.5px solid #111; padding-bottom: 6px;
+    }
+    .inv-footer-row {
+      display: flex; gap: 8px;
+      font-size: 11px; color: #555; margin-bottom: 4px; line-height: 1.5;
+    }
+    .inv-footer-row .fkey { color: #111; font-weight: 500; min-width: 72px; flex-shrink: 0; }
+    .inv-footer-addr { font-size: 11px; color: #555; line-height: 1.8; }
+
+    /* ─── MOBILE ────────────────────────────────────── */
+    @media (max-width: 860px) {
+      .workspace { grid-template-columns: 1fr; }
+      .form-panel { height: auto; position: relative; top: auto; border-right: none; border-bottom: 1px solid var(--color-border); }
+      .preview-panel { padding: 20px 16px; }
+      #invoice-doc { padding: 32px 24px 32px; }
+      .inv-title-text { font-size: 48px; }
+      .inv-brand-text { font-size: 26px; }
+      .inv-client-name { font-size: 20px; }
+      .inv-footer { grid-template-columns: 1fr; gap: 20px; }
+    }
+
+    /* ─── PRINT ─────────────────────────────────────── */
+    @media print {
+      .topbar, .form-panel, .preview-actions { display: none !important; }
+      .workspace { grid-template-columns: 1fr; }
+      .preview-panel { padding: 0; overflow: visible; background: #fff; }
+      #invoice-doc { box-shadow: none; max-width: 100%; padding: 32px 48px; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      AURAMIS AI · Invoice Generator
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-icon" data-theme-toggle aria-label="Toggle theme" title="Toggle light/dark" style="padding:6px;border-radius:4px;cursor:pointer;color:var(--color-text-muted)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <!-- FORM PANEL -->
+    <aside class="form-panel">
+
+      <!-- Sender -->
+      <div class="form-section">
+        <div class="section-label">Your Business</div>
+        <div class="field">
+          <label>Business Name</label>
+          <input type="text" id="from-name" value="Auramis AI" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="from-email" value="info@auramis.ai" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Contact No.</label>
+          <input type="text" id="from-phone" value="+91 63098 91941" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Address</label>
+          <textarea id="from-address" rows="2" oninput="updatePreview()">204, Airbus Apartments, Himayatnagar, Hyderabad - 500029</textarea>
+        </div>
+      </div>
+
+      <!-- Client -->
+      <div class="form-section">
+        <div class="section-label">Invoice To</div>
+        <div class="field">
+          <label>Client / Company Name</label>
+          <input type="text" id="client-name" placeholder="Citizen Law Solicitors" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Address Line 1</label>
+          <input type="text" id="client-addr1" placeholder="101 Shenley Avenue" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Address Line 2</label>
+          <input type="text" id="client-addr2" placeholder="Ruislip, HA4 6BT" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Country</label>
+          <input type="text" id="client-country" placeholder="United Kingdom" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Phone</label>
+          <input type="text" id="client-phone" placeholder="+44 (0) 7515866571" oninput="updatePreview()">
+        </div>
+      </div>
+
+      <!-- Invoice Details -->
+      <div class="form-section">
+        <div class="section-label">Invoice Details</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Invoice No.</label>
+            <input type="text" id="inv-number" value="INAI-26023" oninput="updatePreview()">
+          </div>
+          <div class="field">
+            <label>Currency</label>
+            <select id="inv-currency" onchange="updatePreview()">
+              <option value="£">GBP (£)</option>
+              <option value="₹">INR (₹)</option>
+              <option value="$">USD ($)</option>
+              <option value="€">EUR (€)</option>
+              <option value="¥">JPY (¥)</option>
+              <option value="AED ">AED</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Date</label>
+            <input type="date" id="inv-date" oninput="updatePreview()">
+          </div>
+          <div class="field">
+            <label>Payment Status</label>
+            <select id="inv-status" onchange="updatePreview()">
+              <option value="Unpaid">Unpaid</option>
+              <option value="Paid" selected>Paid</option>
+              <option value="Pending">Pending</option>
+              <option value="Overdue">Overdue</option>
+              <option value="Partial">Partial</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Tax Rate (%)</label>
+            <input type="number" id="inv-tax" value="0" min="0" max="100" step="0.5" oninput="updatePreview()">
+          </div>
+          <div class="field">
+            <label>Discount (%)</label>
+            <input type="number" id="inv-discount" value="0" min="0" max="100" step="0.5" oninput="updatePreview()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Line Items -->
+      <div class="form-section">
+        <div class="section-label">Services / Line Items</div>
+        <div class="li-header">
+          <span>Description</span>
+          <span>Qty</span>
+          <span>Price</span>
+          <span>Total</span>
+          <span></span>
+        </div>
+        <div id="line-items-list"></div>
+        <button class="add-item-btn" onclick="addLineItem()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add service
+        </button>
+        <div class="form-totals">
+          <div class="ft-row"><span>Subtotal</span><span class="val" id="ft-sub">£0.00</span></div>
+          <div class="ft-row" id="ft-disc-row"><span>Discount</span><span class="val" id="ft-disc">-£0.00</span></div>
+          <div class="ft-row" id="ft-tax-row"><span>Tax</span><span class="val" id="ft-tax">£0.00</span></div>
+          <div class="ft-row total"><span>TOTAL</span><span class="val" id="ft-total">£0.00</span></div>
+        </div>
+      </div>
+
+      <!-- Payment Information -->
+      <div class="form-section">
+        <div class="section-label">Payment Information</div>
+        <div class="field">
+          <label>Account Holder Name</label>
+          <input type="text" id="bank-name" value="Manchem Sai Sridhar" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Bank Name</label>
+          <input type="text" id="bank-bank" value="State Bank of India" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>Account Number</label>
+          <input type="text" id="bank-acno" value="34995860993" oninput="updatePreview()">
+        </div>
+        <div class="field">
+          <label>IFSC / SWIFT / Sort Code</label>
+          <input type="text" id="bank-ifsc" value="SBIN0011106" oninput="updatePreview()">
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- PREVIEW PANEL -->
+    <main class="preview-panel">
+      <div class="preview-actions">
+        <button class="btn btn-secondary" onclick="window.print()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+        <button class="btn btn-primary" onclick="downloadPDF()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PDF
+        </button>
+      </div>
+
+      <!-- INVOICE DOCUMENT -->
+      <div id="invoice-doc">
+
+        <!-- AURAMIS AI top right -->
+        <div class="inv-topbar">
+          <div class="inv-brand-text" id="prev-brand">AURAMIS AI</div>
+        </div>
+
+        <!-- INVOICE large title + horizontal line -->
+        <div class="inv-title-row">
+          <div class="inv-title-text">INVOICE</div>
+          <div class="inv-title-line"></div>
+        </div>
+
+        <!-- Date + Invoice No -->
+        <div class="inv-meta-row">
+          <div class="inv-meta-item">Date: <strong id="prev-date">—</strong></div>
+          <div class="inv-meta-item">Invoice No: <strong id="prev-invno">INAI-26023</strong></div>
+        </div>
+
+        <!-- Invoice To -->
+        <div class="inv-to-label">Invoice To</div>
+        <div class="inv-client-name" id="prev-client-name">—</div>
+        <div class="inv-client-detail" id="prev-client-detail"></div>
+
+        <!-- Services Table -->
+        <table class="inv-table">
+          <thead>
+            <tr>
+              <th>Services</th>
+              <th style="text-align:right">Quantity</th>
+              <th style="text-align:right">Price</th>
+              <th style="text-align:right">Total</th>
+            </tr>
+          </thead>
+          <tbody id="prev-items"></tbody>
+          <tfoot id="prev-tfoot"></tfoot>
+        </table>
+
+        <!-- Total bar -->
+        <div class="inv-total-bar">
+          <div class="inv-payment-due">Payment Due: <strong id="prev-status" style="margin-left:4px">Paid</strong></div>
+          <div class="inv-total-label">TOTAL AMOUNT</div>
+          <div class="inv-total-amount" id="prev-total">£ 0.00</div>
+        </div>
+
+        <!-- Footer -->
+        <div class="inv-footer">
+          <div class="inv-footer-section">
+            <div class="inv-footer-label">Payment Information</div>
+            <div id="prev-bank-rows"></div>
+          </div>
+          <div class="inv-footer-section">
+            <div class="inv-footer-label">Address</div>
+            <div class="inv-footer-addr" id="prev-addr"></div>
+          </div>
+        </div>
+
+      </div><!-- /invoice-doc -->
+    </main>
+  </div>
+</div>
+
+<script>
+  /* ─── THEME TOGGLE ─────────────────────────────────────── */
+  (function(){
+    const t = document.querySelector('[data-theme-toggle]');
+    const r = document.documentElement;
+    const sun = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+    const moon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    let d = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    r.setAttribute('data-theme', d);
+    t.innerHTML = d === 'dark' ? sun : moon;
+    t.addEventListener('click', () => {
+      d = d === 'dark' ? 'light' : 'dark';
+      r.setAttribute('data-theme', d);
+      t.innerHTML = d === 'dark' ? sun : moon;
+    });
+  })();
+
+  /* ─── DEFAULT DATE ─────────────────────────────────────── */
+  (function(){
+    const today = new Date();
+    document.getElementById('inv-date').value = today.toISOString().split('T')[0];
+  })();
+
+  /* ─── LINE ITEMS ───────────────────────────────────────── */
+  let lineItems = [
+    { desc: "Digital Marketing - March '26", qty: 1, rate: 60 }
+  ];
+
+  function getCur() { return document.getElementById('inv-currency').value; }
+
+  function fmt(n) {
+    return parseFloat(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtDate(str) {
+    if (!str) return '—';
+    const d = new Date(str + 'T00:00:00');
+    const day = d.getDate();
+    const sfx = ['th','st','nd','rd'][(day%100>10&&day%100<14)?0:Math.min(day%10,3)] || 'th';
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${day}${sfx} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  function calcTotals() {
+    const sub = lineItems.reduce((s,it) => s + it.qty * it.rate, 0);
+    const dp = parseFloat(document.getElementById('inv-discount').value) || 0;
+    const tp = parseFloat(document.getElementById('inv-tax').value) || 0;
+    const disc = sub * dp / 100;
+    const taxable = sub - disc;
+    const tax = taxable * tp / 100;
+    return { sub, disc, dp, tax, tp, total: taxable + tax };
+  }
+
+  function renderLineItems() {
+    const list = document.getElementById('line-items-list');
+    const cur = getCur();
+    list.innerHTML = '';
+    lineItems.forEach((it, i) => {
+      const amt = it.qty * it.rate;
+      const row = document.createElement('div');
+      row.className = 'line-item';
+      row.innerHTML = `
+        <input type="text" placeholder="Service description" value="${esc(it.desc)}" oninput="updateItem(${i},'desc',this.value)">
+        <input type="number" value="${it.qty}" min="0" step="any" oninput="updateItem(${i},'qty',this.value)">
+        <input type="number" value="${it.rate}" min="0" step="any" oninput="updateItem(${i},'rate',this.value)">
+        <div class="li-amount">${cur}${fmt(amt)}</div>
+        <button class="btn-danger" onclick="removeItem(${i})" aria-label="Remove" title="Remove">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>`;
+      list.appendChild(row);
+    });
+  }
+
+  function updateItem(i, key, val) {
+    if (key === 'qty' || key === 'rate') lineItems[i][key] = parseFloat(val) || 0;
+    else lineItems[i][key] = val;
+    updatePreview();
+  }
+
+  function addLineItem() {
+    lineItems.push({ desc: '', qty: 1, rate: 0 });
+    renderLineItems();
+    updatePreview();
+    const inputs = document.querySelectorAll('.line-item input[type=text]');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }
+
+  function removeItem(i) {
+    lineItems.splice(i, 1);
+    renderLineItems();
+    updatePreview();
+  }
+
+  /* ─── UPDATE PREVIEW ───────────────────────────────────── */
+  function updatePreview() {
+    const cur = getCur();
+    renderLineItems();
+
+    /* Brand */
+    const brandName = (document.getElementById('from-name').value || 'AURAMIS AI').toUpperCase();
+    document.getElementById('prev-brand').textContent = brandName;
+
+    /* Date + Invoice No */
+    document.getElementById('prev-date').textContent  = fmtDate(document.getElementById('inv-date').value);
+    document.getElementById('prev-invno').textContent = document.getElementById('inv-number').value || '—';
+
+    /* Client */
+    const cn = document.getElementById('client-name').value;
+    document.getElementById('prev-client-name').textContent = cn || '—';
+    const parts = [
+      document.getElementById('client-addr1').value,
+      document.getElementById('client-addr2').value,
+      document.getElementById('client-country').value,
+      document.getElementById('client-phone').value,
+    ].filter(Boolean);
+    document.getElementById('prev-client-detail').innerHTML = parts.join('<br>');
+
+    /* Line items table */
+    const tbody = document.getElementById('prev-items');
+    tbody.innerHTML = '';
+    if (lineItems.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="4" style="text-align:center;color:#aaa;padding:24px 0;font-size:12px;">No items added</td>';
+      tbody.appendChild(tr);
+    } else {
+      lineItems.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc(it.desc) || '—'}</td>
+          <td>${it.qty}</td>
+          <td>${cur}${fmt(it.rate)}</td>
+          <td>${cur}${fmt(it.qty * it.rate)}</td>`;
+        tbody.appendChild(tr);
+      });
+      // Add a spacer row for breathing room
+      const spacer = document.createElement('tr');
+      spacer.className = 'spacer';
+      spacer.innerHTML = '<td colspan="4"></td>';
+      tbody.appendChild(spacer);
+    }
+
+    /* tfoot for subtotals if tax/discount */
+    const { sub, disc, dp, tax, tp, total } = calcTotals();
+    const tfoot = document.getElementById('prev-tfoot');
+    tfoot.innerHTML = '';
+    if (dp > 0 || tp > 0) {
+      if (dp > 0) {
+        const r1 = document.createElement('tr');
+        r1.innerHTML = `<td></td><td></td><td style="text-align:right;color:#888">Discount (${dp}%)</td><td>-${cur}${fmt(disc)}</td>`;
+        tfoot.appendChild(r1);
+      }
+      if (tp > 0) {
+        const r2 = document.createElement('tr');
+        r2.innerHTML = `<td></td><td></td><td style="text-align:right;color:#888">Tax (${tp}%)</td><td>+${cur}${fmt(tax)}</td>`;
+        tfoot.appendChild(r2);
+      }
+    }
+
+    /* Form totals */
+    document.getElementById('ft-sub').textContent   = cur + fmt(sub);
+    document.getElementById('ft-disc').textContent  = '-' + cur + fmt(disc);
+    document.getElementById('ft-tax').textContent   = '+' + cur + fmt(tax);
+    document.getElementById('ft-total').textContent = cur + fmt(total);
+    document.getElementById('ft-disc-row').style.display = dp > 0 ? '' : 'none';
+    document.getElementById('ft-tax-row').style.display  = tp > 0 ? '' : 'none';
+
+    /* Total on invoice */
+    document.getElementById('prev-total').textContent = cur + ' ' + fmt(total);
+
+    /* Payment due status */
+    document.getElementById('prev-status').textContent = document.getElementById('inv-status').value;
+
+    /* Bank info */
+    const bankRows = document.getElementById('prev-bank-rows');
+    const bankFields = [
+      { key: 'Name', val: document.getElementById('bank-name').value },
+      { key: 'Bank Name', val: document.getElementById('bank-bank').value },
+      { key: 'A/c Number', val: document.getElementById('bank-acno').value },
+      { key: 'IFSC', val: document.getElementById('bank-ifsc').value },
+    ];
+    bankRows.innerHTML = bankFields.filter(f => f.val).map(f =>
+      `<div class="inv-footer-row"><span class="fkey">${esc(f.key)}</span><span>: ${esc(f.val)}</span></div>`
+    ).join('');
+
+    /* Address */
+    const fromEmail  = document.getElementById('from-email').value;
+    const fromPhone  = document.getElementById('from-phone').value;
+    const fromAddr   = document.getElementById('from-address').value;
+    document.getElementById('prev-addr').innerHTML = [
+      fromAddr ? esc(fromAddr) : '',
+      fromEmail ? `Email &nbsp;&nbsp;&nbsp;&nbsp;: ${esc(fromEmail)}` : '',
+      fromPhone ? `Contact no. : ${esc(fromPhone)}` : '',
+    ].filter(Boolean).join('<br>');
+  }
+
+  /* ─── PDF DOWNLOAD ─────────────────────────────────────── */
+  function downloadPDF() {
+    const invNum = document.getElementById('inv-number').value || 'invoice';
+    const client = (document.getElementById('client-name').value || 'client').replace(/\s+/g,'-').toLowerCase();
+    const filename = `${invNum}-${client}.pdf`;
+    const elem = document.getElementById('invoice-doc');
+    html2pdf().set({
+      margin: [0,0,0,0],
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2.5, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(elem).save();
+  }
+
+  /* ─── INIT ─────────────────────────────────────────────── */
+  renderLineItems();
+  updatePreview();
+</script>
+</body>
+</html>
