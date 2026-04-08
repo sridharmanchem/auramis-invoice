@@ -740,10 +740,13 @@
   }
 
   function updateItem(i, key, val) {
-    if (key === 'qty' || key === 'rate') lineItems[i][key] = parseFloat(val) || 0;
-    else lineItems[i][key] = val;
-    updatePreview();
-  }
+  if (key === 'qty' || key === 'rate') lineItems[i][key] = parseFloat(val) || 0;
+  else lineItems[i][key] = val;
+  // Only update the amount display div, don't re-render inputs
+  const amounts = document.querySelectorAll('.li-amount');
+  if (amounts[i]) amounts[i].textContent = getCur() + fmt(lineItems[i].qty * lineItems[i].rate);
+  updatePreview();
+}
 
   function addLineItem() {
     lineItems.push({ desc: '', qty: 1, rate: 0 });
@@ -762,7 +765,6 @@
   /* ─── UPDATE PREVIEW ───────────────────────────────────── */
   function updatePreview() {
     const cur = getCur();
-    renderLineItems();
 
     /* Brand */
     const brandName = (document.getElementById('from-name').value || 'AURAMIS AI').toUpperCase();
