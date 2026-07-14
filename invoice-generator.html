@@ -527,6 +527,16 @@
               <option value="Partial">Partial</option>
             </select>
           </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Payment Due Date</label>
+              <input type="date" id="inv-due-date" oninput="updatePreview()">
+            </div>
+            <div class="field">
+              <label>&nbsp;</label>
+              <div></div>
+            </div>
+          </div>
         </div>
         <div class="field-row">
           <div class="field">
@@ -640,7 +650,11 @@
 
         <!-- Total bar -->
         <div class="inv-total-bar">
-          <div class="inv-payment-due">Payment Due: <strong id="prev-status" style="margin-left:4px">Paid</strong></div>
+          <div class="inv-payment-due">
+            Payment Due:
+            <strong id="prev-status" style="margin-left:4px">Paid</strong>
+            <span id="prev-due-date" style="margin-left:8px"></span>
+          </div>
           <div class="inv-total-label">TOTAL AMOUNT</div>
           <div class="inv-total-amount" id="prev-total">£ 0.00</div>
         </div>
@@ -682,7 +696,13 @@
   /* ─── DEFAULT DATE ─────────────────────────────────────── */
   (function(){
     const today = new Date();
-    document.getElementById('inv-date').value = today.toISOString().split('T')[0];
+    const todayStr = today.toISOString().split('T')[0];
+    if (!document.getElementById('inv-date').value) {
+      document.getElementById('inv-date').value = todayStr;
+    }
+    if (!document.getElementById('inv-due-date').value) {
+      document.getElementById('inv-due-date').value = todayStr;
+    }
   })();
 
   /* ─── LINE ITEMS ───────────────────────────────────────── */
@@ -704,7 +724,14 @@
     if (!str) return '—';
     const d = new Date(str + 'T00:00:00');
     const day = d.getDate();
-    const sfx = ['th','st','nd','rd'][(day%100>10&&day%100<14)?0:Math.min(day%10,3)] || 'th';
+  
+    let sfx = 'th';
+    if (day % 100 < 11 || day % 100 > 13) {
+      if (day % 10 === 1) sfx = 'st';
+      else if (day % 10 === 2) sfx = 'nd';
+      else if (day % 10 === 3) sfx = 'rd';
+    }
+  
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     return `${day}${sfx} ${months[d.getMonth()]} ${d.getFullYear()}`;
   }
@@ -772,6 +799,9 @@
 
     /* Date + Invoice No */
     document.getElementById('prev-date').textContent  = fmtDate(document.getElementById('inv-date').value);
+    document.getElementById('prev-due-date').textContent = document.getElementById('inv-due-date').value
+    ? `(${fmtDate(document.getElementById('inv-due-date').value)})`
+    : '';
     document.getElementById('prev-invno').textContent = document.getElementById('inv-number').value || '—';
 
     /* Client */
